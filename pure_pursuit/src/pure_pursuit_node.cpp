@@ -57,6 +57,10 @@ public:
 
         RCLCPP_INFO(this->get_logger(), "Published Marker");
 
+        double car_x = pose_msg->pose.pose.position.x;
+        double car_y = pose_msg->pose.pose.position.y;
+        double car_z = pose_msg->pose.pose.position.z;
+
 
 
         // MARKERS
@@ -65,9 +69,9 @@ public:
         // marker1.header.stamp = ros::Time::now();
         marker1.type = visualization_msgs::msg::Marker::SPHERE;
         marker1.action = visualization_msgs::msg::Marker::MODIFY;
-        marker1.pose.position.x = 1.0;
-        marker1.pose.position.y = 2.0;
-        marker1.pose.position.z = 0.5;
+        marker1.pose.position.x = car_x;
+        marker1.pose.position.y = car_y;
+        marker1.pose.position.z = car_z + 1.0;
         marker1.pose.orientation.x = 0.0;
         marker1.pose.orientation.y = 0.0;
         marker1.pose.orientation.z = 0.0;
@@ -76,7 +80,7 @@ public:
         marker1.scale.y = 1.0;
         marker1.scale.z = 1.0;
         marker1.color.a = 1.0;
-        marker1.color.r = 0.0;
+        marker1.color.r = 1.0;
         marker1.color.g = 0.0;
         marker1.color.b = 0.0;
 
