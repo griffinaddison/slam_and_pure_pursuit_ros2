@@ -113,7 +113,7 @@ class InteractivePointSelector(Node):
         if feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
             pose = feedback.pose
             marker_id = feedback.marker_name
-            _, _, yaw = transformations.euler_from_quaternion([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
+            _, _, yaw = euler_from_quaternion([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
             self.markers_pos[int(marker_id)] = (pose.position.x, pose.position.y, yaw)
 
     def save_marker_positions(self, filename):
