@@ -57,9 +57,22 @@ private:
 
     rclcpp::Node::SharedPtr node;
 
+    double lookahead_distance = 1.0;
+    double velocity = 5.0;
+
 public:
     PurePursuit() : Node("pure_pursuit_node")
     {
+
+        
+        this->declare_parameter("lookahead_distance", 1.0);
+        this->declare_parameter("velocity", 5.0);
+        
+
+        this->lookahead_distance = this->get_parameter("lookahead_distance").as_double();
+        double velocity = this->get_parameter("velocity").as_double();
+       
+
         // TODO: create ROS subscribers and publishers
 
         pub_marker = this->create_publisher<visualization_msgs::msg::MarkerArray>("marker_array", 10);
@@ -203,9 +216,8 @@ public:
 
         //now step forward in positions until we find the first point that is at least the lookahead distance away
         unsigned int lookahead_point_index = closest_point_index;
-        double lookahead_distance = 1.0;
         double lookahead_point_distance = 0.0;
-        while (lookahead_point_distance < lookahead_distance)
+        while (lookahead_point_distance < this->lookahead_distance)
         {
             lookahead_point_index++;
             //wrap around if we reach the end of the array
@@ -302,7 +314,7 @@ public:
         /////////////////////////////////////////////////// TODO: calculate curvature/steering angle
 
         double lateral_displacement = T_vehicle_goal(1, 3);
-        double curvature = (2 * lateral_displacement) / pow(lookahead_distance, 2);
+        double curvature = (2 * lateral_displacement) / pow(this->lookahead_distance, 2);
 
         
 
@@ -313,7 +325,7 @@ public:
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
         drive_msg.header.frame_id = "base_link";
         drive_msg.drive.steering_angle = atan(curvature * wheel_base);
-        drive_msg.drive.speed = 5.0;
+        drive_msg.drive.speed = this->velocity;
 
         //publish the drive message
         pub_drive->publish(drive_msg);
