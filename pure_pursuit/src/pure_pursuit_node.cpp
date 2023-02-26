@@ -331,3 +331,10 @@ int main(int argc, char **argv)
     rclcpp::shutdown();
     return 0;
 }
+
+
+
+// to do:
+// make some of these parameters tunable with ros parameters and launch file
+// make a launch file
+// enable car to go around waypoint loop in either direction, by instead of lookahead_point ++, figure out current car heading ....
