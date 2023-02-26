@@ -14,7 +14,7 @@ y = data[:, 1]
 z = data[:, 2]
 
 # Set the number of points for the interpolated spline
-n_points = 1000
+n_points = 200
 
 # Generate the interpolated spline
 tck, u = splprep([x, y, z], s=0)
@@ -22,7 +22,7 @@ u_new = np.linspace(u.min(), u.max(), n_points)
 x_new, y_new, z_new = splev(u_new, tck)
 
 # Write the interpolated data to a new CSV file
-with open('interpolated_path.csv', 'w', newline='') as f:
+with open('/home/griffin/Documents/f1tenth_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/interpolated_path.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(['x', 'y', 'z'])
     for i in range(n_points):

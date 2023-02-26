@@ -56,9 +56,17 @@ public:
         sub_pose = this->create_subscription<nav_msgs::msg::Odometry>("/ego_racecar/odom", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
 
         //read csv and convert to 2d float array
-        std::ifstream file("interpolated_waypoints.csv");
-        std::vector<std::vector<float>> positions; // 2D array of float x y positions
+        std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/interpolated_path.csv"); //make sure to place this file
         std::string line;
+
+        RCLCPP_INFO(this->get_logger(), "reading csv");
+
+        if (!file)
+        {
+            RCLCPP_INFO(this->get_logger(), "file not found");
+        }
+
+        // RCLCPP_INFO(this->get_logger(), std::getline(file, line) ? "true" : "false"); //this line is just to check if the file is empty
 
         while (std::getline(file, line))
         {
@@ -66,6 +74,12 @@ public:
             std::vector<float> pos;
 
             std::string token;
+
+            //handle case with column headers
+            if (line[0] == 'x')
+            {
+                continue;
+            }
             while (std::getline(ss, token, ','))
             {
                 pos.push_back(std::stof(token));
@@ -73,7 +87,14 @@ public:
 
             // Add the x y position values to the 2D array
             positions.push_back({pos[0], pos[1]});
+
+            // RCLCPP_INFO(this->get_logger(), "added: \tx: %f, \ty: %f", pos[0], pos[1]);
         }
+
+        RCLCPP_INFO(this->get_logger(), "done reading csv");
+
+        //print out size of csv
+        RCLCPP_INFO(this->get_logger(), "size of csv: %d", positions.size());
 
         // Print out the x y positions
         // for (auto const& pos : positions)
@@ -126,7 +147,7 @@ public:
         // pub_marker->publish(marker1); 
 
 
-        RCLCPP_INFO(this->get_logger(), "before");
+        // RCLCPP_INFO(this->get_logger(), "before");
 
         //create the top level marker array
         visualization_msgs::msg::MarkerArray marker_array;
@@ -154,42 +175,71 @@ public:
         // marker_array.markers[1].header.stamp = node->now();
         marker_array.markers[1].id = 1;
         marker_array.markers[1].type = visualization_msgs::msg::Marker::CUBE_LIST;
-        marker_array.markers[1].action = visualization_msgs::msg::Marker::ADD;
-        marker_array.markers[1].scale.x = 1.0;
-        marker_array.markers[1].scale.y = 1.0;
-        marker_array.markers[1].scale.z = 1.0;
+        marker_array.markers[1].action = visualization_msgs::msg::Marker::MODIFY; 
+        marker_array.markers[1].scale.x = 0.1;
+        marker_array.markers[1].scale.y = 0.1;
+        marker_array.markers[1].scale.z = 0.1;
         marker_array.markers[1].color.r = 0.0;
         marker_array.markers[1].color.g = 1.0;
         marker_array.markers[1].color.b = 0.0;
         marker_array.markers[1].color.a = 1.0;
 
 
+        // RCLCPP_INFO(this->get_logger(), "before");
+        //iterate over positions and print each one
+
+        //print size of positions
+        RCLCPP_INFO(this->get_logger(), "size of positions: %d", positions.size());
+
+        // std::vector<std::vector<float>> positions
+        // for (std::vector<float> pos : positions)
+        // {
+        //     RCLCPP_INFO(this->get_logger(), "x: %f, y: %f", pos[0], pos[1]);
+        // }
+        // RCLCPP_INFO(this->get_logger(), "after");
+
+
+        // Add points to the CubeList marker
+        for (std::vector<float> pos : positions) 
+        {
+            geometry_msgs::msg::Point point;
+            point.x = pos[0];
+            point.y = pos[1];
+            point.z = 0.0;
+
+            marker_array.markers[1].points.push_back(point);
+        }
+
+        //print out the number of points
+        // RCLCPP_INFO(this->get_logger(), "size of points: %d", marker_array.markers[1].points.size()); // this seems to print 0 because the points vector is empty because the for loop never runs because positions is empty because 
+
+
      
-        geometry_msgs::msg::Point point;
-        point.x = 2.0;
-        point.y = 1.0;
-        point.z = 0.0;
+        // geometry_msgs::msg::Point point;
+        // point.x = 2.0;
+        // point.y = 1.0;
+        // point.z = 0.0;
 
-        marker_array.markers[1].points.push_back(point);
+        // marker_array.markers[1].points.push_back(point);
 
-        point.x = 2.0;
-        point.y = 2.0;
-        point.z = 0.0;
+        // point.x = 2.0;
+        // point.y = 2.0;
+        // point.z = 0.0;
 
-        marker_array.markers[1].points.push_back(point);
+        // marker_array.markers[1].points.push_back(point);
 
-        point.x = 2.0;
-        point.y = 3.0;
-        point.z = 0.0;
+        // point.x = 2.0;
+        // point.y = 3.0;
+        // point.z = 0.0;
 
-        marker_array.markers[1].points.push_back(point);
+        // marker_array.markers[1].points.push_back(point);
 
         // std::shared_ptr<visualization_msgs::msg::MarkerArray> marker_array_ptr = std::make_shared<visualization_msgs::msg::MarkerArray>(marker_array);
 
 
         pub_marker->publish(marker_array);
 
-        RCLCPP_INFO(this->get_logger(), "after");
+        // RCLCPP_INFO(this->get_logger(), "after");
 
 
 
