@@ -70,7 +70,7 @@ public:
         std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/interpolated_path.csv"); //make sure to place this file
         std::string line;
 
-        RCLCPP_INFO(this->get_logger(), "reading csv");
+        // RCLCPP_INFO(this->get_logger(), "reading csv");
 
         if (!file)
         {
@@ -102,10 +102,10 @@ public:
             // RCLCPP_INFO(this->get_logger(), "added: \tx: %f, \ty: %f", pos[0], pos[1]);
         }
 
-        RCLCPP_INFO(this->get_logger(), "done reading csv");
+        // RCLCPP_INFO(this->get_logger(), "done reading csv");
 
         //print out size of csv
-        RCLCPP_INFO(this->get_logger(), "size of csv: %d", positions.size());
+        // RCLCPP_INFO(this->get_logger(), "size of csv: %d", positions.size());
 
         // Print out the x y positions
         // for (auto const& pos : positions)
@@ -197,11 +197,13 @@ public:
         double closest_point_distance = 99799.9;
         for (int i = 0; i < positions.size(); i++)
         {
+            // RCLCPP_INFO(this->get_logger(), "iterating");
             double distance = sqrt(pow(positions[i][0] - car_x, 2) + pow(positions[i][1] - car_y, 2));
             if (distance < closest_point_distance)
             {
                 closest_point_distance = distance;
                 closest_point_index = i;
+                // RCLCPP_INFO(this->get_logger(), "closest point index: %d", closest_point_index);
             }
         }
         //place a blue marker on this point and add it to the marker array
@@ -231,6 +233,11 @@ public:
         while (lookahead_point_distance < lookahead_distance)
         {
             lookahead_point_index++;
+            //wrap around if we reach the end of the array
+            if (lookahead_point_index >= positions.size())
+            {
+                lookahead_point_index = 0;
+            }
             lookahead_point_distance = sqrt(pow(positions[lookahead_point_index][0] - car_x, 2) + pow(positions[lookahead_point_index][1] - car_y, 2));
         }
         
@@ -342,7 +349,7 @@ public:
         double goal_point_distance = sqrt(pow(goalPointX_car, 2) + pow(goalPointY_car, 2));
         double goal_point_angle = atan2(goalPointY_car, goalPointX_car);
 
-        RCLCPP_INFO(this->get_logger(), "goal:\t distance: %f, \theading: %f", goal_point_distance, car_yaw);
+        // RCLCPP_INFO(this->get_logger(), "goal:\t distance: %f, \theading: %f", goal_point_distance, car_yaw);
         // RCLCPP_INFO(node->get_logger(), "goal:\t \theading: %f", car_yaw);
         // RCLCPP_INFO(this->get_logger(), "goal: distance: %f", goal_point_distance);
 
@@ -394,7 +401,7 @@ public:
         drive_msg.header.frame_id = "base_link";
         // drive_msg.header.stamp = node->now();
         drive_msg.drive.steering_angle = atan(curvature * wheel_base);
-        drive_msg.drive.speed = 1.0;
+        drive_msg.drive.speed = 3.0;
 
         //publish the drive message
         pub_drive->publish(drive_msg);

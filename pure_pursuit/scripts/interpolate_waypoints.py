@@ -14,7 +14,7 @@ y = data[:, 1]
 z = data[:, 2]
 
 # Set the number of points for the interpolated spline
-n_points = 200
+n_points = 500
 
 # Generate the interpolated spline
 tck, u = splprep([x, y, z], s=0)
