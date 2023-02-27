@@ -59,6 +59,8 @@ private:
 
     double lookahead_distance = 1.0;
     double velocity = 5.0;
+    double speed_lookahead_distance = 1.0;
+    double brake_gain = 1.0;
 
 public:
     PurePursuit() : Node("pure_pursuit_node")
@@ -67,10 +69,14 @@ public:
         
         this->declare_parameter("lookahead_distance", 1.0);
         this->declare_parameter("velocity", 5.0);
+        this->declare_parameter("speed_lookahead_distance", 1.0);
+        this->declare_parameter("brake_gain", 1.0);
         
 
         this->lookahead_distance = this->get_parameter("lookahead_distance").as_double();
-        double velocity = this->get_parameter("velocity").as_double();
+        this->velocity = this->get_parameter("velocity").as_double();
+        this->speed_lookahead_distance = this->get_parameter("speed_lookahead_distance").as_double();
+        this->brake_gain = this->get_parameter("brake_gain").as_double();
        
 
         // TODO: create ROS subscribers and publishers
@@ -129,7 +135,7 @@ public:
 
         //create the top level marker array
         visualization_msgs::msg::MarkerArray marker_array;
-        marker_array.markers.resize(5);
+        marker_array.markers.resize(7);
 
         // Sphere Marker
         marker_array.markers[0].header.frame_id = "map";
@@ -219,6 +225,7 @@ public:
         double lookahead_point_distance = 0.0;
         while (lookahead_point_distance < this->lookahead_distance)
         {
+
             lookahead_point_index++;
             //wrap around if we reach the end of the array
             if (lookahead_point_index >= positions.size())
@@ -227,7 +234,49 @@ public:
             }
             lookahead_point_distance = sqrt(pow(positions[lookahead_point_index][0] - car_x, 2) + pow(positions[lookahead_point_index][1] - car_y, 2));
         }
-        
+
+
+
+
+        //now lets do second speed lookahead point off of the first lookahead point
+        unsigned int speed_lookahead_point_index = lookahead_point_index;
+        double speed_lookahead_point_distance = 0.0;
+        while (speed_lookahead_point_distance < this->speed_lookahead_distance)
+        {
+            speed_lookahead_point_index++;
+            //wrap around if we reach the end of the array
+            if (speed_lookahead_point_index >= positions.size())
+            {
+                speed_lookahead_point_index = 0;
+            }
+            speed_lookahead_point_distance = sqrt(pow(positions[speed_lookahead_point_index][0] - car_x, 2) + pow(positions[speed_lookahead_point_index][1] - car_y, 2));
+        }
+
+        //now lets place a marker on this point
+
+        marker_array.markers[5].header.frame_id = "map";
+        marker_array.markers[5].id = 5;
+        marker_array.markers[5].type = visualization_msgs::msg::Marker::CUBE;
+        marker_array.markers[5].action = visualization_msgs::msg::Marker::MODIFY;
+        marker_array.markers[5].pose.position.x = positions[speed_lookahead_point_index][0];
+        marker_array.markers[5].pose.position.y = positions[speed_lookahead_point_index][1];
+        marker_array.markers[5].pose.position.z = 0.0;
+        marker_array.markers[5].scale.x = 0.2;
+        marker_array.markers[5].scale.y = 0.2;
+        marker_array.markers[5].scale.z = 0.2;
+        marker_array.markers[5].color.r = 1.0;
+        marker_array.markers[5].color.g = 0.0;
+        marker_array.markers[5].color.b = 0.0;
+        marker_array.markers[5].color.a = 1.0;
+
+
+        // //get the angle between the car and the lookahead point
+        // double goalPointX_car = positions[lookahead_point_index][0] - car_x;
+        // double goalPointY_car = positions[lookahead_point_index][1] - car_y;
+
+
+
+
         double goalPointX_map = positions[lookahead_point_index][0];
         double goalPointY_map = positions[lookahead_point_index][1];
 
@@ -264,7 +313,6 @@ public:
             pose_msg->pose.pose.orientation.w);
         tf2::Matrix3x3 m(q);
         m.getRPY(car_roll, car_pitch, car_yaw);
-        
 
 
         //find homogeneous transform from map frame to vehicle frame
@@ -308,6 +356,68 @@ public:
 
 
 
+
+        //convert the speed point to the vehicle frame of reference
+
+
+
+        double speedPointX_map = positions[speed_lookahead_point_index][0];
+        double speedPointY_map = positions[speed_lookahead_point_index][1];
+
+
+        //find homogeneous transform from map frame to speed point
+        Eigen::Matrix4d T_map_speed;
+        T_map_speed << 1, 0, 0, speedPointX_map,
+            0, 1, 0, speedPointY_map,
+            0, 0, 1, 0,
+            0, 0, 0, 1;
+
+        //find the homogeneous transform from vehicle frame to speed point
+        Eigen::Matrix4d T_vehicle_speed = T_vehicle_map * T_map_speed;
+
+        //to check, find transformation from map to speed point using car to speed point
+        Eigen::Matrix4d T_map_speed_check = T_map_vehicle * T_vehicle_speed;
+
+
+
+
+
+
+        //find heading of speed point in car frame of reference
+        double speed_heading = atan2(T_vehicle_speed(1, 3), T_vehicle_speed(0, 3));
+
+
+        //map the magnitude of the speed point heading to range [0, 1]
+        double brake_amount = this->brake_gain * abs(speed_heading);
+
+
+
+
+
+        //add a teal marker of id 6 at this point in the map frame
+        marker_array.markers[6].header.frame_id = "map";
+        marker_array.markers[6].id = 6;
+        marker_array.markers[6].type = visualization_msgs::msg::Marker::CUBE;
+        marker_array.markers[6].action = visualization_msgs::msg::Marker::MODIFY;
+        marker_array.markers[6].pose.position.x = T_map_speed_check(0, 3);
+        marker_array.markers[6].pose.position.y = T_map_speed_check(1, 3);
+        marker_array.markers[6].pose.position.z = 1.0;
+        marker_array.markers[6].scale.x = 0.2;
+        marker_array.markers[6].scale.y = 0.2;
+        marker_array.markers[6].scale.z = brake_amount;
+        marker_array.markers[6].color.r = 0.0;
+        marker_array.markers[6].color.g = 1.0;
+        marker_array.markers[6].color.b = 1.0;
+        marker_array.markers[6].color.a = 1.0;
+
+
+
+
+
+
+
+
+
         pub_marker->publish(marker_array);
 
 
@@ -325,7 +435,7 @@ public:
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
         drive_msg.header.frame_id = "base_link";
         drive_msg.drive.steering_angle = atan(curvature * wheel_base);
-        drive_msg.drive.speed = this->velocity;
+        drive_msg.drive.speed = this->velocity - brake_amount;
 
         //publish the drive message
         pub_drive->publish(drive_msg);
