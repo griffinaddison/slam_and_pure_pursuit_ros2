@@ -55,6 +55,8 @@ private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr pub_drive;
     std::vector<std::vector<float>> positions;
 
+    
+
     rclcpp::Node::SharedPtr node;
 
     double lookahead_distance = 1.0;
@@ -86,7 +88,8 @@ public:
         pub_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("drive", 10);
 
         //read csv and convert to 2d float array
-        std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/interpolated_path.csv"); //make sure to place this file
+        // std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/interpolated_path.csv"); //make sure to place this file
+        std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/f1tenth_gym/sim_ws/src/f1tenth_gym_ros/maps/levine_2nd.csv"); //make sure to place this file
         std::string line;
 
         //check if file is empty

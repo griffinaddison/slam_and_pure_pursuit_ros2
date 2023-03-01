@@ -19,10 +19,10 @@ def generate_launch_description():
         executable='pure_pursuit_node',
         name='pure_pursuit_node',
         parameters=[
-            {"lookahead_distance": 1.25},
-            {"velocity": 9.0},
-            {"speed_lookahead_distance": 2.0},
-            {"brake_gain": 12.0},
+            {"lookahead_distance": 1.25}, #levine 1.25
+            {"velocity": 3.0}, #levine 9.0
+            {"speed_lookahead_distance": 2.0}, #levine 2.0
+            {"brake_gain": 1.0}, #levine 12.0
         ]
         )
 
