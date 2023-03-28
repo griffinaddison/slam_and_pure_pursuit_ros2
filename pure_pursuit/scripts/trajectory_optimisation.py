@@ -4,20 +4,26 @@ import numpy as np
 
 class Optimize:
 
-    def __init__(self, file_name, order, max_acc):
+    def __init__(self, file_name, order):
         self.file_name = file_name
         self.order = order
-        self.max_vel = max_vel
-        self.max_acc = max_acc
-        self.dt = dt
+        # self.max_vel = max_vel
+        # self.max_acc = max_acc
 
-
-    def cost_function(self, x, y, yaw, v, k, Lf):
-
-        pass
+    def objective(self,const, expected_arrivals,order = 5):
+        W = order + 1
+        obj = 0
+        for i, Ti in enumerate(expected_arrivals):
+            H = np.array([[720 * Ti**5, 360 * Ti**4, 120*Ti**3],
+                      [360 * Ti**4, 192 * Ti**3, 72 * Ti**2],
+                      [120*Ti**3, 72 * Ti**2, 36 * Ti]])
+            x = const[i * W:i * W + 3]
+            obj += x.T @ H @ x
+        return obj
 
     def load_tajectory(self, file_name):
         goals = []
+        expected_arrivals = []
         with open(file_name, mode='r') as csv_file:
             csv_reader = csv.DictReader(csv_file)
             line_count = 0
@@ -27,9 +33,10 @@ class Optimize:
                     line_count += 1
                 print(f'\t{row["x"]} {row["y"]}.')
                 goals.append([float(row["x"]), float(row["y"])])
+                expected_arrivals.append(float(row["t"]))
                 line_count += 1
             print(f'Processed {line_count} lines.')
-        return np.array(goals)    
+        return np.array(goals), np.array(expected_arrivals)    
 
     def get_acc_matrix(self,time,order):
         arr = np.array([(order - j-1)*(order - j)*time**(order - j - 2) for j in range(order + 1)])
@@ -56,7 +63,13 @@ class Optimize:
             constraints[:, id * W:(id + 1) * W] = m
         return constraints
 
-    def create_matrices(self, goals):
+    def optimize_trajectory(self, goals, times):
+
+        segs = lean(goals)
+        order = self.order
+
+
+        assert len(times) == segs
 
         M_mat = []
         b_mat = []
@@ -85,7 +98,7 @@ class Optimize:
         jerk_cons_t = np.zeros((order+1,))
         jerk_cons_t[-4] = 3*2
         
-        M1 = np.vstack((loc_cons_t, loc_cons_tp, vel_cons_t))
+        M1 = np.vstack((loc_cons_t, loc_cons_tp, jerk_cons_t))
         
         M_mat.append(self.constraints_row([M1], [0], segs))
         b_mat.append(np.array([points[0], points[1], 0]))
@@ -139,51 +152,86 @@ class Optimize:
         vel_cons_tp = self.get_vel_matrix(times[-1],order)
         acc_cons_tp = self.get_vel_matrix(times[-1],order)
         jerk_cons_tp = self.get_jerk_matrix(times[-1],order)
-        matrix = np.vstack((loc_cons_t, loc_cons_tp, vel_cons_tp))
+        matrix = np.vstack((loc_cons_t, loc_cons_tp, jerk_cons_tp))
         
         M_mat.append(self.constraints_row([matrix], [segs - 1], segs))
 
-        b_mat.append(np.array([points[segs-1], points[segs], 0]))
+        b_mat.append(np.array([points[segs-1], points[0], 0]))
         #b_mat.append(np.array([points[segs-1], points[segs], 0,0]))
 
         vel_cons_tp = np.expand_dims(self.get_vel_matrix(times[-2],order),0)
         acc_cons_tp = np.expand_dims(self.get_acc_matrix(times[-2],order),0)
 
         jerk_cons_tp = np.expand_dims(self.get_jerk_matrix(times[-2],order),0)
-        snap_cons_tp = np.expand_dims(self.get_snap_matrix(times[-2],order),0)
+
         # Adding more self.constraints_row to make system fully determinable
-        M_mat.append(self.constraints_row([np.expand_dims(vel_cons_t,0),-vel_cons_tp], [segs - 1, segs - 2], segs))
+        # M_mat.append(self.constraints_row([np.expand_dims(vel_cons_t,0),-vel_cons_tp], [segs - 1, segs - 2], segs))
 
-        b_mat.append(np.zeros(1))
+        # b_mat.append(np.zeros(1))
 
-        M_mat.append(self.constraints_row([np.expand_dims(acc_cons_t,0),-acc_cons_tp], [segs - 1, segs - 2], segs))
+        # M_mat.append(self.constraints_row([np.expand_dims(acc_cons_t,0),-acc_cons_tp], [segs - 1, segs - 2], segs))
         
-        b_mat.append(np.zeros(1))
+        # b_mat.append(np.zeros(1))
 
-        M_mat.append(self.constraints_row([np.expand_dims(jerk_cons_t,0),-jerk_cons_tp], [segs - 1, segs - 2], segs))
+        # M_mat.append(self.constraints_row([np.expand_dims(jerk_cons_t,0),-jerk_cons_tp], [segs - 1, segs - 2], segs))
     
-        b_mat.append(np.zeros(1))
+        # b_mat.append(np.zeros(1))
+        M = np.concatenate(M_mat, axis=0)
+        b = np.concatenate(b_mat)
+        
+
+        constraints_mat.append({'type': 'eq', 'fun': lambda c: b - M @ c})
+
+        # M_ineq = np.concatenate(M_ineq_mat,axis=0)
+        # b_ineq = np.concatenate(b_ineq_mat)
+
+        # constraints_mat.append({'type': 'ineq', 'fun': lambda c: b_ineq - M_ineq @ c})
+
+        # Run optimization problem
+        print("Optimising")
+        #before = time.time()
+        solution = opt.minimize(
+            self.objective,
+            coeffs,
+            args=(times, order),
+            constraints=constraints_mat,
+            options={
+                'maxiter': 10000,
+                'disp': True
+            })
+
+        #after = time.time()
+        #print("----- Optimization finished: {} secs.".format(after - before))
+        if not solution['success']:
+            print("Optimization failed: {}".format(solution['message']))
+            return None
+
+        # parameters of the entire trajectory
+        return solution['x']
 
 
-    def store_optimal_trajectory(file_name):
+    def store_optimal_trajectory(self, file_name, data):
         '''
             Store the optimal trajectory in a csv file
         '''
-
-        pass
-
-    def optimize_trajectory(data):
+        with open(file_name, 'w') as f:
+            # store the coefficients in a json file
+            json.dump(data, f)
         
-        pass
 
 def parse_args():
     from argparse import ArgumentParser
     parser = ArgumentParser()
     parser.add_argument('-f', '--file', type=str, default='waypoints.csv')
-    parser.add_argument('-o', '--output', type=str, default='optimal_trajectory.csv')
+    parser.add_argument('-o', '--output', type=str, default='optimal_trajectory.json')
+    parser.add_argument('-d', '--order', type=int, default=5)
     args = parser.parse_args()
     return args
 
 def main():
-        
-    pass
+    args = parse_args()
+    optimizer = TrajectoryOptimizer(args.file, args.order)
+    goals, times = optimizer.load_tajectory(args.file)
+    coeffs = optimizer.optimize_trajectory(goals, times)
+    if coeffs is not None:
+        optimizer.store_optimal_trajectory(args.output, coeffs)
