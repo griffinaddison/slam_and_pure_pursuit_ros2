@@ -118,7 +118,6 @@ public:
 
             // Add the x y position values to the 2D array
             positions.push_back({pos[0], pos[1]});
-
         }
     }
 
@@ -230,7 +229,7 @@ public:
         {
 
             lookahead_point_index++;
-            //wrap around if we reach the end of the array
+            //wrap around if we reach the end of the array 
             if (lookahead_point_index >= positions.size())
             {
                 lookahead_point_index = 0;
@@ -414,14 +413,7 @@ public:
         marker_array.markers[6].color.a = 1.0;
 
 
-
-
-
-
-
-
-
-        pub_marker->publish(marker_array);
+       pub_marker->publish(marker_array);
 
 
         /////////////////////////////////////////////////// TODO: calculate curvature/steering angle
