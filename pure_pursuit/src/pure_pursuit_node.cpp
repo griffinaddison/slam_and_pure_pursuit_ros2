@@ -770,7 +770,7 @@ public:
         pub_marker->publish(marker_array);
 
 
-
+        RCLCPP_INFO(this->get_logger(), " lookahead: %f, velocity: %f,  ", this->lookahead_distance, this->velocity);
         /////////////////////////////////////////////////// TODO: publish drive message, don't forget to limit the steering angle.
         double lateral_displacement = T_vehicle_goal(1, 3);
         double curvature = (2 * lateral_displacement) / pow(this->lookahead_distance, 2);
