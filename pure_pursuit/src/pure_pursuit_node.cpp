@@ -73,7 +73,7 @@ public:
         this->declare_parameter("velocity", 5.0);
         this->declare_parameter("speed_lookahead_distance", 1.0);
         this->declare_parameter("brake_gain", 1.0);
-        this->declare_parameter("wheelbase", 1.0);
+        this->declare_parameter("wheelbase", 0.33);
         ths->declare_parameter("visualize", false);
         
 
@@ -143,7 +143,7 @@ public:
         visualization_msgs::msg::MarkerArray marker_array;
         marker_array.markers.resize(7);
 
-        if(this->visualize){
+        if (this->visualize){
             // Sphere Marker
             marker_array.markers[0].header.frame_id = "map";
             marker_array.markers[0].id = 0;
@@ -210,7 +210,7 @@ public:
             }
         }
 
-        if(this->visualize){
+        if (this->visualize){
             //place a blue marker on this point and add it to the marker array
             marker_array.markers[2].header.frame_id = "map";
             marker_array.markers[2].id = 2;
@@ -265,7 +265,7 @@ public:
 
         //now lets place a marker on this point
 
-        if(this->visualize){
+        if (this->visualize){
             marker_array.markers[5].header.frame_id = "map";
             marker_array.markers[5].id = 5;
             marker_array.markers[5].type = visualization_msgs::msg::Marker::CUBE;
@@ -293,7 +293,7 @@ public:
         double goalPointX_map = positions[lookahead_point_index][0];
         double goalPointY_map = positions[lookahead_point_index][1];
 
-        if(this->visualize){
+        if (this->visualize){
             //place a green marker on this point and add it to the marker array
             marker_array.markers[3].header.frame_id = "map";
             marker_array.markers[3].id = 3;
@@ -353,7 +353,7 @@ public:
         //to check, find transformation from map to goal point using car to goal point
         Eigen::Matrix4d T_map_goal_check = T_map_vehicle * T_vehicle_goal;
         
-        if(this->visualize){
+        if (this->visualize){
             //add a yellow marker at this point in the map frame
             marker_array.markers[4].header.frame_id = "map";
             marker_array.markers[4].id = 4;
@@ -410,7 +410,7 @@ public:
 
 
 
-        if this->visualize{
+        if (this->visualize){
             //add a teal marker of id 6 at this point in the map frame
             marker_array.markers[6].header.frame_id = "map";
             marker_array.markers[6].id = 6;
@@ -429,7 +429,7 @@ public:
         }
 
 
-       pub_marker->publish(marker_array);
+        pub_marker->publish(marker_array);
 
 
 
