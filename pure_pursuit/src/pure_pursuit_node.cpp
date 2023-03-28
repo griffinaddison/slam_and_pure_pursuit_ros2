@@ -89,7 +89,12 @@ public:
 
         //read csv and convert to 2d float array
         // std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/interpolated_path.csv"); //make sure to place this file
-        std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/f1tenth_gym/sim_ws/src/f1tenth_gym_ros/maps/levine_2nd.csv"); //make sure to place this file
+        // std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/f1tenth_gym/sim_ws/src/f1tenth_gym_ros/maps/levine_2nd.csv"); //make sure to place this file
+        // std::ifstream file("/home/adithyakvh/Courses/F1-tenth/ROS_Installations_F1_tenth/all_labs_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/interpolated_path.csv"); //make sure to place this file
+        std::ifstream file("/home/adithyakvh/Courses/F1-tenth/ROS_Installations_F1_tenth/all_labs_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/sparse_straights_interpolated.csv"); //make sure to place this file
+        
+        //std::ifstream file("/home/adithyakvh/Courses/F1-tenth/ROS_Installations_F1_tenth/all_labs_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/waypoints_straight_filtered.csv"); //make sure to place this file
+
         std::string line;
 
         //check if file is empty
