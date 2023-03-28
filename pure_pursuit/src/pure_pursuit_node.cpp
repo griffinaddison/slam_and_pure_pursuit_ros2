@@ -63,6 +63,9 @@ private:
     double velocity = 5.0;
     double speed_lookahead_distance = 1.0;
     double brake_gain = 1.0;
+    double wheel_base = 0.33;
+    bool visualize = false;
+
 
 public:
     PurePursuit() : Node("pure_pursuit_node")
@@ -73,15 +76,15 @@ public:
         this->declare_parameter("velocity", 5.0);
         this->declare_parameter("speed_lookahead_distance", 1.0);
         this->declare_parameter("brake_gain", 1.0);
-        this->declare_parameter("wheelbase", 0.33);
-        ths->declare_parameter("visualize", false);
+        this->declare_parameter("wheel_base", 0.33);
+        this->declare_parameter("visualize", false);
         
 
         this->lookahead_distance = this->get_parameter("lookahead_distance").as_double();
         this->velocity = this->get_parameter("velocity").as_double();
         this->speed_lookahead_distance = this->get_parameter("speed_lookahead_distance").as_double();
         this->brake_gain = this->get_parameter("brake_gain").as_double();
-        this->wheelbase = this->get_parameter("wheelbase").as_double();
+        this->wheel_base = this->get_parameter("wheel_base").as_double();
         this->visualize = this->get_parameter("visualize").as_bool();
 
 
@@ -439,7 +442,8 @@ public:
 
 
         /////////////////////////////////////////////////// TODO: publish drive message, don't forget to limit the steering angle.
-
+        double lateral_displacement = T_vehicle_goal(1, 3);
+        double curvature = (2 * lateral_displacement) / pow(this->lookahead_distance, 2);
         //create a drive message
         double wheel_base = this->wheel_base;
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
