@@ -80,6 +80,9 @@ public:
         this->declare_parameter("brake_gain", 1.0);
         this->declare_parameter("wheel_base", 0.33);
         this->declare_parameter("visualize", false);
+        this->declare_parameter("curvature_thresh", 0.1);
+        this->declare_parameter("acceleration_lookahead_distance", 5.0);
+
         
 
         this->lookahead_distance = this->get_parameter("lookahead_distance").as_double();
@@ -88,6 +91,8 @@ public:
         this->brake_gain = this->get_parameter("brake_gain").as_double();
         this->wheel_base = this->get_parameter("wheel_base").as_double();
         this->visualize = this->get_parameter("visualize").as_bool();
+        this->curvature_thresh = this->get_parameter("curvature_thresh").as_double();
+        this->acceleration_lookahead_distance = this->get_parameter("acceleration_lookahead_distance").as_double();
 	
 
         // TODO: create ROS subscribers and publishers
@@ -601,6 +606,19 @@ public:
             speed_lookahead_point_distance = sqrt(pow(positions[speed_lookahead_point_index][0] - car_x, 2) + pow(positions[speed_lookahead_point_index][1] - car_y, 2));
         }
 
+        unsigned int accel_lookahead_point_index = speed_lookahead_point_index;
+        double accel_lookahead_point_distance = 0.0;
+        while (accel_lookahead_point_distance < this->acceleration_lookahead_distance)
+        {
+            accel_lookahead_point_index++;
+            //wrap around if we reach the end of the array
+            if (accel_lookahead_point_index >= positions.size())
+            {
+                accel_lookahead_point_index = 0;
+            }
+            accel_lookahead_point_distance = sqrt(pow(positions[speed_lookahead_point_index][0] - car_x, 2) + pow(positions[speed_lookahead_point_index][1] - car_y, 2));
+        }
+
         //now lets place a marker on this point
 
         if (this->visualize){
@@ -736,17 +754,30 @@ public:
 
 
 
+        double accelPointX_map = positions[accel_lookahead_point_index][0];
+        double accelPointY_map = positions[accel_lookahead_point_index][1];
+
+
+        //find homogeneous transform from map frame to speed point
+        Eigen::Matrix4d T_map_accel;
+        T_map_speed << 1, 0, 0, accelPointX_map,
+            0, 1, 0, accelPointY_map,
+            0, 0, 1, 0,
+            0, 0, 0, 1;
+
+        //find the homogeneous transform from vehicle frame to speed point
+        Eigen::Matrix4d T_vehicle_accel = T_vehicle_map * T_map_accel;
+
+        //to check, find transformation from map to speed point using car to speed point
+        Eigen::Matrix4d T_map_speed_accel = T_map_vehicle * T_vehicle_accel;
 
 
         //find heading of speed point in car frame of reference
-        double speed_heading = atan2(T_vehicle_speed(1, 3), T_vehicle_speed(0, 3));
+        double accel_heading = atan2(T_vehicle_accel(1, 3), T_vehicle_accel(0, 3));
 
 
         //map the magnitude of the speed point heading to range [0, 1]
         double brake_amount = this->brake_gain * abs(speed_heading);
-
-
-
 
         if (this->visualize){
             //add a teal marker of id 6 at this point in the map frame
@@ -774,12 +805,20 @@ public:
         /////////////////////////////////////////////////// TODO: publish drive message, don't forget to limit the steering angle.
         double lateral_displacement = T_vehicle_goal(1, 3);
         double curvature = (2 * lateral_displacement) / pow(this->lookahead_distance, 2);
+
+        double velocity = this->velocity;
+        if (abs(curvature) < this->curvature_thresh && abs(accel_heading) < 2 * this->curvature_thresh){
+            velocity = velocity + this->brake_gain * abs(2 * this->curvature_thresh - accel_heading)
+        }
+        else if (abs(curvature) < -1.0 / this->wheel_base){
+            curvature = -1.0 / this->wheel_base;
+        }
         //create a drive message
         double wheel_base = this->wheel_base;
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
         drive_msg.header.frame_id = "base_link";
         drive_msg.drive.steering_angle = atan(curvature * wheel_base);
-        drive_msg.drive.speed = this->velocity - brake_amount;
+        drive_msg.drive.speed = velocity - brake_amount;
         //publish the drive message
         pub_drive->publish(drive_msg);
 
