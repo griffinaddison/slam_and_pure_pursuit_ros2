@@ -71,6 +71,13 @@ private:
     double acceleration_lookahead_distance = 5.0;
     double accel_gain = 2.0;
 
+    // for gap follow
+    double min_bubble_radius = 0.25;
+    double max_bubble_radius = 1.5;
+    double overtake_curvature = 0.2;
+    bool gap_follow = false;
+    double inflaton_heading = 0.15;
+    float* processed_ranges;
 
 public:
     PurePursuit() : Node("pure_pursuit_node")
@@ -99,6 +106,25 @@ public:
         this->acceleration_lookahead_distance = this->get_parameter("acceleration_lookahead_distance").as_double();
         this->accel_gain = this->get_parameter("accel_gain").as_double();
 
+        // Gap follow parameter declaration
+        this->declare_parameter("min_bubble_radius", 0.25);
+        this->declare_parameter("max_bubble_radius", 1.5);
+        this->declare_parameter("gap_follow", false);
+        this->declare_parameter("overtake_curvature", 0.2);
+
+
+        this->min_bubble_radius = this->get_parameter("min_bubble_radius").as_double();
+        this->max_bubble_radius = this->get_parameter("max_bubble_radius").as_double();
+        this->overtake_curvature = this->get_parameter("overtake_curvature").as_double();
+        this->gap_follow = this->get_parameter("gap_follow").as_bool();
+
+        this->processed_ranges = new float[1080];
+
+        this->min_lidar_range = -2.1;
+        this->max_lidar_range = 2.1;
+        this->lidar_angle_increment = 0.0;
+
+
         // TODO: create ROS subscribers and publishers
 
         pub_marker = this->create_publisher<visualization_msgs::msg::MarkerArray>("marker_array", 10);
@@ -107,6 +133,7 @@ public:
 
         pub_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("drive", 10);
 
+        scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 100, std::bind(&PurePursuit::scan_callback, this, _1));
         //read csv and convert to 2d float array
         // std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/lab-5-slam-and-pure-pursuit-team-10/pure_pursuit/src/interpolated_path.csv"); //make sure to place this file
         // std::ifstream file("/home/griffin/Documents/f1tenth_ws/src/f1tenth_gym/sim_ws/src/f1tenth_gym_ros/maps/levine_2nd.csv"); //make sure to place this file
@@ -490,6 +517,15 @@ public:
         
         /////////////////////////////////////////////////// TODO: publish drive message, don't forget to limit the steering angle.
         double lateral_displacement = T_vehicle_goal(1, 3);
+        double horizonal_displacement = T_vehicle_goal(0, 3);
+        double heading = atan2(lateral_displacement, horizonal_displacement);
+
+        // correct curavture wrt to gap
+        if (this->gap_follow){
+            heading = this->find_safe_heading(heading);
+            lateral_displacement = tan(heading) * horizonal_displacement;
+        }
+
         double curvature = (2 * lateral_displacement) / pow(this->lookahead_distance, 2);
 
         double velocity = this->velocity;
@@ -510,6 +546,74 @@ public:
         pub_drive->publish(drive_msg);
 
 
+    }
+    /*
+    Processes lidar ranges
+
+    */
+    void process_lidar_gaps(float *ranges){
+        //inflates the lidar data by certain amount o make obstacles look bigger for safety
+        for (int i = 0; i < 1080; i++) {
+            if (ranges[i] < this->min_bubble_radius){
+                ranges[i] = 0.0;
+            }
+        
+            if (ranges[i] > this->max_bubble_radius) {
+                ranges[i] = -1.0;
+            }
+        }
+        int window = (float)this->inflation_window/this->lidar_angle_increment;
+        float range_init = ranges[0]
+        // forward direction
+        for(int i = 0; i < 1080; i++){
+            if (i>=window){
+                range_init = ranges[i-window];
+            }
+            // Inflates the obstacles
+            if (ranges[i]==0.0){
+                ranges[i] = range_init;
+            }
+        }
+        //backward direction
+        for(int j = 1079; j >= 0; j--){
+            if (j<=1079-window){
+                range_init = ranges[j+window];
+            }
+            // Inflates the obstacles
+            if (ranges[i]==0.0){
+                ranges[i] = range_init;
+            }
+        }
+
+    }
+
+    double find_safe_heading(double current_heading){
+        // verifies wheter current heading is in a gap and finds minimum correction if not in gap
+        // verify if we need to overtake 
+        int idx = (int)(current_heading - this->min_lidar_range)/this->lidar_angle_increment;
+        if (ranges[idx] == -1.0){
+            return  current_heading;
+        }
+
+        // else find heading with minimum deviation and is obstacle free
+        double min_free_heading = 3.14;
+        double corrected_heading = current_heading;
+        for (int i = 0; i < 1080; i++) {
+            double lidar_heading = min_lidar_range + i * angle_disc;
+            if (this->ranges[i] == -1.0 && abs(lidar_heading - current_heading) < min_free_heading){
+                min_free_heading = abs(lidar_heading - current_heading);
+                corrected_heading = lidar_heading;
+            }
+        }
+        return corrected_heading;
+    }
+
+    void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg){
+        this->ranges = const_cast<float*>(scan_msg->ranges.data());
+        tis->lidar_angle_increment = scan_msg->angle_increment;
+        this->min_lidar_range = scan_msg->angle_min;
+        this->max_lidar_range = scan_msg->angle_max;
+        this->process_lidar_gaps(this->ranges);
     }
 
     ~PurePursuit() {} // destructor, which is called when the object is destroyed,
