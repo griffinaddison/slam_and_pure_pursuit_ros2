@@ -51,10 +51,11 @@ class PurePursuit : public rclcpp::Node
 private:
 
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_marker;
-    //rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_pose;
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_pose;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_pose;
+    //rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_pose;
 
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr pub_drive;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
     std::vector<std::vector<float>> positions;
 
     
@@ -76,8 +77,13 @@ private:
     double max_bubble_radius = 1.5;
     double overtake_curvature = 0.2;
     bool gap_follow = false;
-    double inflaton_heading = 0.15;
-    float* processed_ranges;
+    double inflation_window = 0.15;
+    float* ranges;
+
+    double min_lidar_range;
+    double max_lidar_range;
+    double lidar_angle_increment;
+
 
 public:
     PurePursuit() : Node("pure_pursuit_node")
@@ -110,15 +116,17 @@ public:
         this->declare_parameter("min_bubble_radius", 0.25);
         this->declare_parameter("max_bubble_radius", 1.5);
         this->declare_parameter("gap_follow", false);
+        this->declare_parameter("inflation_window", 0.15);
         this->declare_parameter("overtake_curvature", 0.2);
 
 
         this->min_bubble_radius = this->get_parameter("min_bubble_radius").as_double();
         this->max_bubble_radius = this->get_parameter("max_bubble_radius").as_double();
         this->overtake_curvature = this->get_parameter("overtake_curvature").as_double();
+        this->inflation_window = this->get_parameter("inflation_window").as_double();
         this->gap_follow = this->get_parameter("gap_follow").as_bool();
 
-        this->processed_ranges = new float[1080];
+        this->ranges = new float[1080];
 
         this->min_lidar_range = -2.1;
         this->max_lidar_range = 2.1;
@@ -128,8 +136,8 @@ public:
         // TODO: create ROS subscribers and publishers
 
         pub_marker = this->create_publisher<visualization_msgs::msg::MarkerArray>("marker_array", 10);
-        //sub_pose = this->create_subscription<nav_msgs::msg::Odometry>("/ego_racecar/odom", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
-        sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>("/pf/viz/inferred_pose", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
+        sub_pose = this->create_subscription<nav_msgs::msg::Odometry>("/ego_racecar/odom", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
+        //sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>("/pf/viz/inferred_pose", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
 
         pub_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("drive", 10);
 
@@ -139,7 +147,7 @@ public:
         //std::ifstream file("/home/nvidia//f1tenth_ws/src/race-3-team-10/pure_pursuit_race/waypoints/raceline_pv.csv"); //make sure to place this file
         
         //std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_2.csv"); //make sure to place this fil
-        //std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_pv.csv"); //make sure to place this file
+        std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_pv.csv"); //make sure to place this file
 
         std::string line;
 
@@ -172,17 +180,17 @@ public:
         }
     }
 
-    //void pose_callback(const nav_msgs::msg::Odometry::ConstSharedPtr pose_msg) //stub code had &pose_msg, the & caused build errors. also said ConstPtr instead of ConstSharedPtr, which also made errors
-    void pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg)
+    void pose_callback(const nav_msgs::msg::Odometry::ConstSharedPtr pose_msg) //stub code had &pose_msg, the & caused build errors. also said ConstPtr instead of ConstSharedPtr, which also made errors
+    //void pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg)
     {
 
 
         
-        double car_x = pose_msg->pose.position.x;
-        double car_y = pose_msg->pose.position.y;
+        // double car_x = pose_msg->pose.position.x;
+        // double car_y = pose_msg->pose.position.y;
 
-        //double car_x = pose_msg->pose.pose.position.x;
-        //double car_y = pose_msg->pose.pose.position.y;
+        double car_x = pose_msg->pose.pose.position.x;
+        double car_y = pose_msg->pose.pose.position.y;
 
         RCLCPP_INFO(this->get_logger(), "pose_callback");
         //////////////////////////////////////// WAYPOINT MARKERS ////////////////////////////////////////
@@ -375,16 +383,16 @@ public:
         double car_yaw = 0.0;
 
         // get roll pitch and yaw from quaternion
-       // tf2::Quaternion q(
-         //   pose_msg->pose.pose.orientation.x,
-         //   pose_msg->pose.pose.orientation.y,
-         //   pose_msg->pose.pose.orientation.z,
-         //   pose_msg->pose.pose.orientation.w);
-        tf2::Quaternion q(
-            pose_msg->pose.orientation.x,
-            pose_msg->pose.orientation.y,
-            pose_msg->pose.orientation.z,
-            pose_msg->pose.orientation.w);
+       tf2::Quaternion q(
+           pose_msg->pose.pose.orientation.x,
+           pose_msg->pose.pose.orientation.y,
+           pose_msg->pose.pose.orientation.z,
+           pose_msg->pose.pose.orientation.w);
+        // tf2::Quaternion q(
+        //     pose_msg->pose.orientation.x,
+        //     pose_msg->pose.orientation.y,
+        //     pose_msg->pose.orientation.z,
+        //     pose_msg->pose.orientation.w);
         tf2::Matrix3x3 m(q);
         m.getRPY(car_roll, car_pitch, car_yaw);
 
@@ -512,13 +520,21 @@ public:
         double lateral_displacement = T_vehicle_goal(1, 3);
         double horizonal_displacement = T_vehicle_goal(0, 3);
         double heading = atan2(lateral_displacement, horizonal_displacement);
-
+        // TODO: need to implement the idea where if the curvature is high the car slows down and doesn't attempt
+        // safe overtaking maneuvers
+        // The purepursuit code has already accounted for the performance around static obstacles
+        //double distance_to_obstacle = 
         // correct curavture wrt to gap
+        //TODO: further reduce the speed of the car during aggressive turns if there is an obstacle right in'
+        // fron tof it
         if (this->gap_follow){
-            heading = this->find_safe_heading(heading);
-            lateral_displacement = tan(heading) * horizonal_displacement;
+            double overtake_heading = this->find_safe_heading(heading);
+            double lateral_displacement_over = tan(overtake_heading) * horizonal_displacement;
+
+            lateral_displacement = lateral_displacement_over;
         }
 
+        // decide when to overtake for now find the safest gap
         double curvature = (2 * lateral_displacement) / pow(this->lookahead_distance, 2);
 
         double velocity = this->velocity;
@@ -537,8 +553,6 @@ public:
         drive_msg.drive.speed = velocity - brake_amount;
         //publish the drive message
         pub_drive->publish(drive_msg);
-
-
     }
     /*
     Processes lidar ranges
@@ -546,6 +560,7 @@ public:
     */
     void process_lidar_gaps(float *ranges){
         //inflates the lidar data by certain amount o make obstacles look bigger for safety
+        RCLCPP_INFO(this->get_logger(), "inflating lidar data");
         for (int i = 0; i < 1080; i++) {
             if (ranges[i] < this->min_bubble_radius){
                 ranges[i] = 0.0;
@@ -556,7 +571,7 @@ public:
             }
         }
         int window = (float)this->inflation_window/this->lidar_angle_increment;
-        float range_init = ranges[0]
+        float range_init = ranges[0];
         // forward direction
         for(int i = 0; i < 1080; i++){
             if (i>=window){
@@ -568,13 +583,14 @@ public:
             }
         }
         //backward direction
+        range_init = ranges[1079];
         for(int j = 1079; j >= 0; j--){
             if (j<=1079-window){
                 range_init = ranges[j+window];
             }
             // Inflates the obstacles
-            if (ranges[i]==0.0){
-                ranges[i] = range_init;
+            if (ranges[j]==0.0){
+                ranges[j] = range_init;
             }
         }
 
@@ -587,12 +603,16 @@ public:
         if (ranges[idx] == -1.0){
             return  current_heading;
         }
-
+        
+        // TODO: restrict the search to between two specified ranges so that we minimally avoid 
+        // computing safe heading with respect to the static obstacles
         // else find heading with minimum deviation and is obstacle free
         double min_free_heading = 3.14;
         double corrected_heading = current_heading;
+
+
         for (int i = 0; i < 1080; i++) {
-            double lidar_heading = min_lidar_range + i * angle_disc;
+            double lidar_heading = min_lidar_range + i * this->lidar_angle_increment;
             if (this->ranges[i] == -1.0 && abs(lidar_heading - current_heading) < min_free_heading){
                 min_free_heading = abs(lidar_heading - current_heading);
                 corrected_heading = lidar_heading;
@@ -603,7 +623,7 @@ public:
 
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg){
         this->ranges = const_cast<float*>(scan_msg->ranges.data());
-        tis->lidar_angle_increment = scan_msg->angle_increment;
+        this->lidar_angle_increment = scan_msg->angle_increment;
         this->min_lidar_range = scan_msg->angle_min;
         this->max_lidar_range = scan_msg->angle_max;
         this->process_lidar_gaps(this->ranges);
