@@ -528,10 +528,12 @@ public:
         //TODO: further reduce the speed of the car during aggressive turns if there is an obstacle right in'
         // fron tof it
         if (this->gap_follow){
+            RCLCPP_INFO(this->get_logger(), "gap following activated");
             double overtake_heading = this->find_safe_heading(heading);
             double lateral_displacement_over = tan(overtake_heading) * horizonal_displacement;
 
             lateral_displacement = lateral_displacement_over;
+            RCLCPP_INFO(this->get_logger(), "overtake heading: %f, original heading: %f", overtake_heading, heading );
         }
 
         // decide when to overtake for now find the safest gap
@@ -613,9 +615,9 @@ public:
 
         for (int i = 0; i < 1080; i++) {
             double lidar_heading = min_lidar_range + i * this->lidar_angle_increment;
-            if (this->ranges[i] == -1.0 && abs(lidar_heading + current_heading) < min_free_heading){
-                min_free_heading = abs(lidar_heading + current_heading);
-                corrected_heading = lidar_heading;
+            if (this->ranges[i] == -1.0 && abs(-lidar_heading - current_heading) < min_free_heading){
+                min_free_heading = abs(-lidar_heading - current_heading);
+                corrected_heading = -lidar_heading;
             }
         }
         return corrected_heading;
