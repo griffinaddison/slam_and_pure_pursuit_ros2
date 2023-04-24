@@ -599,7 +599,7 @@ public:
     double find_safe_heading(double current_heading){
         // verifies wheter current heading is in a gap and finds minimum correction if not in gap
         // verify if we need to overtake 
-        int idx = (int)(current_heading - this->min_lidar_range)/this->lidar_angle_increment;
+        int idx = (int)(-current_heading - this->min_lidar_range)/this->lidar_angle_increment;
         if (ranges[idx] == -1.0){
             return  current_heading;
         }
@@ -613,8 +613,8 @@ public:
 
         for (int i = 0; i < 1080; i++) {
             double lidar_heading = min_lidar_range + i * this->lidar_angle_increment;
-            if (this->ranges[i] == -1.0 && abs(lidar_heading - current_heading) < min_free_heading){
-                min_free_heading = abs(lidar_heading - current_heading);
+            if (this->ranges[i] == -1.0 && abs(lidar_heading + current_heading) < min_free_heading){
+                min_free_heading = abs(lidar_heading + current_heading);
                 corrected_heading = lidar_heading;
             }
         }

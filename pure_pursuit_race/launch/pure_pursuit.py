@@ -29,7 +29,7 @@ def generate_launch_description():
             {"curvature_thresh": 0.1},
             {"accel_gain": 0.0},
             {"min_bubble_radius": 0.25},
-            {"max_bubble_radius": 1.5},
+            {"max_bubble_radius": 2.5},
             {"gap_follow": True},
             {"overtake_curvature": 0.2},
             {"inflation_heading": 0.1}
