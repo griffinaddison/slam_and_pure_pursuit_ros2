@@ -565,12 +565,15 @@ public:
         RCLCPP_INFO(this->get_logger(), "inflating lidar data");
         for (int i = 0; i < 1080; i++) {
             if (ranges[i] < this->min_bubble_radius){
-                ranges[i] = 0.0;
+                this->ranges[i] = 0.0;
             }
-        
-            if (ranges[i] > this->max_bubble_radius) {
-                ranges[i] = -1.0;
+            else if (ranges[i] > this->max_bubble_radius) {
+                this->ranges[i] = -1.0;
+            
+            }else{
+                this->ranges[i] = ranges[i];
             }
+
         }
         int window = (float)this->inflation_window/this->lidar_angle_increment;
         float range_init = ranges[0];
@@ -580,8 +583,8 @@ public:
                 range_init = ranges[i-window];
             }
             // Inflates the obstacles
-            if (ranges[i]==0.0){
-                ranges[i] = range_init;
+            if (ranges[i]<=0.0 && range_init >0.0){
+                this->ranges[i] = range_init;
             }
         }
         //backward direction
@@ -591,10 +594,11 @@ public:
                 range_init = ranges[j+window];
             }
             // Inflates the obstacles
-            if (ranges[j]==0.0){
-                ranges[j] = range_init;
+            if (ranges[j]<=0.0 && range_init > 0.0){
+                this->ranges[j] = range_init;
             }
         }
+
 
     }
 
@@ -624,11 +628,10 @@ public:
     }
 
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg){
-        this->ranges = const_cast<float*>(scan_msg->ranges.data());
         this->lidar_angle_increment = scan_msg->angle_increment;
         this->min_lidar_range = scan_msg->angle_min;
         this->max_lidar_range = scan_msg->angle_max;
-        this->process_lidar_gaps(this->ranges);
+        this->process_lidar_gaps(const_cast<float*>(scan_msg->ranges.data()););
     }
 
     ~PurePursuit() {} // destructor, which is called when the object is destroyed,
