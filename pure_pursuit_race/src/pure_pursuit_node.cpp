@@ -58,6 +58,11 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
     std::vector<std::vector<float>> positions;
 
+    // write a publisher for a pose and a heading
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_heading;
+
+    // processed ranges scan publisher
+    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub_ranges;
     
 
     rclcpp::Node::SharedPtr node;
@@ -112,6 +117,7 @@ public:
         this->acceleration_lookahead_distance = this->get_parameter("acceleration_lookahead_distance").as_double();
         this->accel_gain = this->get_parameter("accel_gain").as_double();
 
+
         // Gap follow parameter declaration
         this->declare_parameter("min_bubble_radius", 0.25);
         this->declare_parameter("max_bubble_radius", 1.5);
@@ -142,12 +148,14 @@ public:
         pub_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("drive", 10);
 
         scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 100, std::bind(&PurePursuit::scan_callback, this, _1));
+
+        pub_ranges = this->create_publisher<sensor_msgs::msg::LaserScan>("/ranges", 4);
         //read csv and convert to 2d float array
         //std::ifstream file("/home/nvidia/f1tenth_ws/src/race-3-team-10/pure_pursuit_race/waypoints/raceline_2.csv"); //make sure to place this fil
         //std::ifstream file("/home/nvidia//f1tenth_ws/src/race-3-team-10/pure_pursuit_race/waypoints/raceline_pv.csv"); //make sure to place this file
         
         //std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_2.csv"); //make sure to place this fil
-        std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_pv.csv"); //make sure to place this file
+        std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_6.csv"); //make sure to place this file
 
         std::string line;
 
@@ -197,7 +205,7 @@ public:
 
         //create the top level marker array
         visualization_msgs::msg::MarkerArray marker_array;
-        marker_array.markers.resize(7);
+        marker_array.markers.resize(8);
 
         if (this->visualize){
             // Sphere Marker
@@ -504,7 +512,7 @@ public:
             marker_array.markers[6].pose.position.z = 1.0;
             marker_array.markers[6].scale.x = 0.2;
             marker_array.markers[6].scale.y = 0.2;
-            marker_array.markers[6].scale.z = brake_amount;
+            marker_array.markers[6].scale.z = 0.2;
             marker_array.markers[6].color.r = 0.0;
             marker_array.markers[6].color.g = 1.0;
             marker_array.markers[6].color.b = 1.0;
@@ -534,7 +542,40 @@ public:
 
             lateral_displacement = lateral_displacement_over;
             RCLCPP_INFO(this->get_logger(), "overtake heading: %f, original heading: %f", overtake_heading, heading );
+        
+            if (this->visualize){
+                //corrected heading
+                T_map_goal << 1, 0, 0, goalPointX_map,
+                0, 1, 0, goalPointY_map,
+                0, 0, 1, 0,
+                0, 0, 0, 1;
+
+            
+                //find the homogeneous transform from vehicle frame to goal point
+                Eigen::Matrix4d T_vehicle_over_head = T_vehicle_map * T_map_goal;
+                T_vehicle_over_head(1,3) = lateral_displacement_over;
+                T_vehicle_over_head(0,3) = horizonal_displacement;
+                Eigen::Matrix4d T_vehicle_over_goal = T_map_vehicle * T_vehicle_over_head;
+
+                marker_array.markers[7].header.frame_id = "map";
+                marker_array.markers[7].id = 7;
+                marker_array.markers[7].type = visualization_msgs::msg::Marker::SPHERE;
+                marker_array.markers[7].action = visualization_msgs::msg::Marker::MODIFY;
+                marker_array.markers[7].pose.position.x = T_vehicle_over_goal(0, 3);
+                marker_array.markers[7].pose.position.y = T_vehicle_over_goal(1, 3);
+                marker_array.markers[7].pose.position.z = 0.5;
+                marker_array.markers[7].scale.x = 0.3;
+                marker_array.markers[7].scale.y = 0.3;
+                marker_array.markers[7].scale.z = 0.3;
+                marker_array.markers[7].color.r = 1.0;
+                marker_array.markers[7].color.g = 0.0;
+                marker_array.markers[7].color.b = 1.0;
+                marker_array.markers[7].color.a = 1.0;
         }
+        }
+
+       
+
 
         // decide when to overtake for now find the safest gap
         double curvature = (2 * lateral_displacement) / pow(this->lookahead_distance, 2);
@@ -605,9 +646,9 @@ public:
     double find_safe_heading(double current_heading){
         // verifies wheter current heading is in a gap and finds minimum correction if not in gap
         // verify if we need to overtake 
-        int idx = (int)(-current_heading - this->min_lidar_range)/this->lidar_angle_increment;
-        if (ranges[idx] == -1.0){
-            return  current_heading;
+        int idx = (int)(current_heading - this->min_lidar_range)/this->lidar_angle_increment;
+        if (this->ranges[idx] == -1.0){
+            return current_heading;
         }
         
         // TODO: restrict the search to between two specified ranges so that we minimally avoid 
@@ -619,9 +660,9 @@ public:
 
         for (int i = 0; i < 1080; i++) {
             double lidar_heading = min_lidar_range + i * this->lidar_angle_increment;
-            if (this->ranges[i] == -1.0 && abs(-lidar_heading - current_heading) < min_free_heading){
-                min_free_heading = abs(-lidar_heading - current_heading);
-                corrected_heading = -lidar_heading;
+            if (this->ranges[i] == -1.0 && abs(lidar_heading - current_heading) < min_free_heading){
+                min_free_heading = abs(lidar_heading - current_heading);
+                corrected_heading = lidar_heading;
             }
         }
         return corrected_heading;
@@ -631,7 +672,27 @@ public:
         this->lidar_angle_increment = scan_msg->angle_increment;
         this->min_lidar_range = scan_msg->angle_min;
         this->max_lidar_range = scan_msg->angle_max;
-        this->process_lidar_gaps(const_cast<float*>(scan_msg->ranges.data()););
+        this->process_lidar_gaps(const_cast<float*>(scan_msg->ranges.data()));
+        
+        // publish this->ranges
+        sensor_msgs::msg::LaserScan scan_msg_out;
+        scan_msg_out.header = scan_msg->header;
+        scan_msg_out.angle_increment = scan_msg->angle_increment;
+        scan_msg_out.angle_min = scan_msg->angle_min;
+        scan_msg_out.angle_max = scan_msg->angle_max;
+        scan_msg_out.range_min = scan_msg->range_min;
+        scan_msg_out.range_max = scan_msg->range_max;
+
+        float *publish_ranges = new float[1080];
+        for (int i = 0; i < 1080; i++) {
+            if (this->ranges[i] == -1.0){
+                publish_ranges[i] = 0.0;
+            }else{
+                publish_ranges[i] = this->ranges[i];
+            }
+        }
+        scan_msg_out.ranges = std::vector<float>(publish_ranges, publish_ranges + 1080);
+        pub_ranges->publish(scan_msg_out);
     }
 
     ~PurePursuit() {} // destructor, which is called when the object is destroyed,
