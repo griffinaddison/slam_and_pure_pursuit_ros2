@@ -51,8 +51,8 @@ class PurePursuit : public rclcpp::Node
 private:
 
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_marker;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_pose;
-    //rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_pose;
+    //rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_pose;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_pose;
 
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr pub_drive;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
@@ -142,20 +142,20 @@ public:
         // TODO: create ROS subscribers and publishers
 
         pub_marker = this->create_publisher<visualization_msgs::msg::MarkerArray>("marker_array", 10);
-        sub_pose = this->create_subscription<nav_msgs::msg::Odometry>("/ego_racecar/odom", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
-        //sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>("/pf/viz/inferred_pose", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
+        //sub_pose = this->create_subscription<nav_msgs::msg::Odometry>("/ego_racecar/odom", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
+        sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>("/pf/viz/inferred_pose", 100 , std::bind(&PurePursuit::pose_callback, this, _1));
 
         pub_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("drive", 10);
 
-        scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 100, std::bind(&PurePursuit::scan_callback, this, _1));
+        //scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 100, std::bind(&PurePursuit::scan_callback, this, _1));
 
         pub_ranges = this->create_publisher<sensor_msgs::msg::LaserScan>("/ranges", 4);
         //read csv and convert to 2d float array
-        //std::ifstream file("/home/nvidia/f1tenth_ws/src/race-3-team-10/pure_pursuit_race/waypoints/raceline_2.csv"); //make sure to place this fil
+        std::ifstream file("/home/nvidia/f1tenth_ws/src/race-3-team-10/pure_pursuit_race/waypoints/raceline_4.csv"); //make sure to place this fil
         //std::ifstream file("/home/nvidia//f1tenth_ws/src/race-3-team-10/pure_pursuit_race/waypoints/raceline_pv.csv"); //make sure to place this file
         
         //std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_2.csv"); //make sure to place this fil
-        std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_6.csv"); //make sure to place this file
+        //std::ifstream file("/sim_ws/src/pure_pursuit_race/waypoints/raceline_6.csv"); //make sure to place this file
 
         std::string line;
 
@@ -188,17 +188,17 @@ public:
         }
     }
 
-    void pose_callback(const nav_msgs::msg::Odometry::ConstSharedPtr pose_msg) //stub code had &pose_msg, the & caused build errors. also said ConstPtr instead of ConstSharedPtr, which also made errors
-    //void pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg)
+    //void pose_callback(const nav_msgs::msg::Odometry::ConstSharedPtr pose_msg) //stub code had &pose_msg, the & caused build errors. also said ConstPtr instead of ConstSharedPtr, which also made errors
+    void pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg)
     {
 
 
         
-        // double car_x = pose_msg->pose.position.x;
-        // double car_y = pose_msg->pose.position.y;
+        double car_x = pose_msg->pose.position.x;
+        double car_y = pose_msg->pose.position.y;
 
-        double car_x = pose_msg->pose.pose.position.x;
-        double car_y = pose_msg->pose.pose.position.y;
+        //double car_x = pose_msg->pose.pose.position.x;
+        //double car_y = pose_msg->pose.pose.position.y;
 
         RCLCPP_INFO(this->get_logger(), "pose_callback");
         //////////////////////////////////////// WAYPOINT MARKERS ////////////////////////////////////////
@@ -391,16 +391,16 @@ public:
         double car_yaw = 0.0;
 
         // get roll pitch and yaw from quaternion
-       tf2::Quaternion q(
-           pose_msg->pose.pose.orientation.x,
-           pose_msg->pose.pose.orientation.y,
-           pose_msg->pose.pose.orientation.z,
-           pose_msg->pose.pose.orientation.w);
-        // tf2::Quaternion q(
-        //     pose_msg->pose.orientation.x,
-        //     pose_msg->pose.orientation.y,
-        //     pose_msg->pose.orientation.z,
-        //     pose_msg->pose.orientation.w);
+       //tf2::Quaternion q(
+           //pose_msg->pose.pose.orientation.x,
+           //pose_msg->pose.pose.orientation.y,
+           //pose_msg->pose.pose.orientation.z,
+           //pose_msg->pose.pose.orientation.w);
+        tf2::Quaternion q(
+             pose_msg->pose.orientation.x,
+             pose_msg->pose.orientation.y,
+             pose_msg->pose.orientation.z,
+             pose_msg->pose.orientation.w);
         tf2::Matrix3x3 m(q);
         m.getRPY(car_roll, car_pitch, car_yaw);
 
