@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'pure_pursuit'
+package_name = 'pure_pursuit_race'
 
 setup(
     name=package_name,
