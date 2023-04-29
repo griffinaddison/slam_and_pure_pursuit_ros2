@@ -36,6 +36,8 @@ def pointChecker(x,y):
     bcl4 = 1
     ccl4 = 0.4599
 
+    ## below is the max acceptable distance from the centerlines
+    maxDistance = 0.2
 
     ## first, check if the point is within the outer track
     withinOutterTrack = (al1*x + bl1*y <= cl1) and (al2*x + bl2*y <= cl2) and (al3*x + bl3*y >= cl3) and (al4*x + bl4*y >= cl4)
@@ -48,7 +50,7 @@ def pointChecker(x,y):
     d4 = abs(acl4*x + bcl4*y - ccl4) / ((acl4**2 + bcl4**2)**0.5)
 
     ## now check if the point is within +- 0.25m of any of the centerlines
-    withinCenterlines = (d1 <= 0.25) or (d2 <= 0.25) or (d3 <= 0.25) or (d4 <= 0.25)
+    withinCenterlines = (d1 <= maxDistance) or (d2 <= maxDistance) or (d3 <= maxDistance) or (d4 <= maxDistance)
 
     return withinOutterTrack and withinCenterlines
 
