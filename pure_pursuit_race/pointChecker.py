@@ -54,4 +54,4 @@ def pointChecker(x,y):
 
     return withinOutterTrack and withinCenterlines
 
-print(pointChecker(-9.5778, 5.1599))
+# print(pointChecker(-9.5778, 5.1599))
