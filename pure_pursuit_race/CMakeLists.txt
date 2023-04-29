@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(pure_pursuit)
+project(pure_pursuit_race)
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
@@ -23,7 +23,8 @@ foreach(PACKAGE
   std_msgs
   visualization_msgs
   Eigen3
-  tf2_ros)
+  tf2_ros
+  race_3_interfaces)
 
   find_package(${PACKAGE} REQUIRED)
 
@@ -35,6 +36,9 @@ include_directories(
   ${EIGEN3_INCLUDE_DIRS}
 )
 
+include_directories(${CMAKE_INSTALL_PREFIX}/include/race_3_interfaces/msg)
+
+
 # Create Cpp executable
 add_executable(pure_pursuit_node src/pure_pursuit_node.cpp)
 
@@ -42,13 +46,16 @@ ament_target_dependencies(pure_pursuit_node
   rclcpp geometry_msgs ackermann_msgs nav_msgs sensor_msgs std_msgs visualization_msgs tf2_ros
 )
 
+
+
+
 # Install Cpp executables
 install(TARGETS
   pure_pursuit_node
   DESTINATION lib/${PROJECT_NAME})
 
 # Install Python modules
-ament_python_install_package(${PROJECT_NAME})
+# ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
